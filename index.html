@@ -1,0 +1,852 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sopa de Letras Mágica</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome Font for Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Canvas Confetti CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&family=Quicksand:wght@500;600;700&display=swap" rel="stylesheet">
+    
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        fredoka: ['Fredoka', 'sans-serif'],
+                        quicksand: ['Quicksand', 'sans-serif'],
+                    },
+                    colors: {
+                        themePink: { 100: '#ffe4e6', 400: '#fb7185', 500: '#f43f5e', 600: '#e11d48' },
+                        themeAstro: { 100: '#e0e7ff', 400: '#818cf8', 500: '#6366f1', 800: '#1e1b4b' },
+                        themeAztec: { 100: '#fef3c7', 400: '#fbbf24', 500: '#f59e0b', 800: '#78350f' },
+                        themeFloral: { 100: '#fce7f3', 400: '#f472b6', 500: '#ec4899', 700: '#be185d' },
+                        themeAnimals: { 100: '#dcfce7', 400: '#4ade80', 500: '#22c55e', 800: '#14532d' },
+                        themeSea: { 100: '#e0f2fe', 400: '#38bdf8', 500: '#06b6d4', 800: '#164e63' },
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body {
+            font-family: 'Quicksand', sans-serif;
+            user-select: none;
+            -webkit-user-select: none;
+            touch-action: manipulation;
+        }
+        
+        .font-title {
+            font-family: 'Fredoka', cursive;
+        }
+
+        /* Glassmorphism Effect */
+        .glass-panel {
+            background: rgba(255, 255, 255, 0.85);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.5);
+        }
+
+        /* Responsive Grid Cell Styling */
+        .letter-cell {
+            aspect-ratio: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.15s ease;
+            border-radius: 0.375rem;
+        }
+
+        .letter-cell:hover {
+            transform: scale(1.08);
+            z-index: 10;
+        }
+
+        /* Selection styles */
+        .cell-selected {
+            background-color: #f3e8ff !important;
+            color: #9333ea !important;
+            transform: scale(1.05);
+            box-shadow: 0 0 10px rgba(147, 51, 234, 0.4);
+        }
+
+        .cell-found {
+            animation: pulse-found 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+
+        @keyframes pulse-found {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.25) rotate(3deg); }
+            100% { transform: scale(1); }
+        }
+
+        /* Custom Scrollbar for list */
+        .custom-scrollbar::-webkit-scrollbar {
+            width: 6px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+            background: rgba(0, 0, 0, 0.05);
+            border-radius: 8px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: rgba(0, 0, 0, 0.2);
+            border-radius: 8px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+            background: rgba(0, 0, 0, 0.3);
+        }
+    </style>
+</head>
+<body class="bg-slate-100 min-h-screen text-slate-800 flex flex-col justify-between transition-colors duration-500" id="body-bg">
+
+    <!-- Top Header -->
+    <header class="w-full pt-4 pb-2 px-4 text-center relative z-10">
+        <div class="max-w-5xl mx-auto flex flex-col md:flex-row items-center justify-between gap-4">
+            <div class="flex items-center gap-3">
+                <div id="theme-logo" class="w-12 h-12 rounded-2xl bg-white shadow-md flex items-center justify-center text-2xl text-pink-500 transition-transform hover:rotate-12">
+                    <i class="fa-solid fa-shapes"></i>
+                </div>
+                <div class="text-left">
+                    <h1 class="text-2xl md:text-3xl font-bold font-title tracking-wide text-slate-800" id="main-title">Sopa de Letras</h1>
+                    <p class="text-xs md:text-sm font-semibold text-slate-500" id="sub-title">¡Encuentra todas las palabras ocultas!</p>
+                </div>
+            </div>
+
+            <!-- Stats Bar (Timer, Words Found, Sound) -->
+            <div class="flex items-center gap-3 bg-white/80 px-4 py-2 rounded-2xl shadow-sm border border-white/60">
+                <!-- Word Counter -->
+                <div class="flex items-center gap-2 px-3 py-1 bg-indigo-50 text-indigo-700 rounded-xl font-bold text-sm">
+                    <i class="fa-solid fa-check-double text-indigo-500"></i>
+                    <span id="found-counter">0 / 10</span>
+                </div>
+
+                <!-- Timer -->
+                <div class="flex items-center gap-2 px-3 py-1 bg-amber-50 text-amber-700 rounded-xl font-bold text-sm">
+                    <i class="fa-solid fa-stopwatch text-amber-500"></i>
+                    <span id="timer-display">00:00</span>
+                </div>
+
+                <!-- Mute Toggle -->
+                <button id="btn-sound" class="p-2 w-9 h-9 flex items-center justify-center rounded-xl bg-slate-100 text-slate-600 hover:bg-slate-200 transition" title="Activar/Desactivar Sonido">
+                    <i class="fa-solid fa-volume-high" id="sound-icon"></i>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content Area -->
+    <main class="max-w-5xl w-full mx-auto px-3 my-2 flex-grow flex flex-col gap-4">
+        
+        <!-- Category Selector -->
+        <div class="w-full overflow-x-auto pb-2 custom-scrollbar">
+            <div class="flex min-w-max gap-2 md:gap-3 justify-start md:justify-center px-2" id="category-tabs">
+                <!-- JS populated categories -->
+            </div>
+        </div>
+
+        <!-- Controls & Game Board Grid Container -->
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-4 items-start">
+            
+            <!-- Sidebar: Controls & Word List -->
+            <div class="lg:col-span-4 flex flex-col gap-4 order-2 lg:order-1">
+                
+                <!-- Controls Card -->
+                <div class="glass-panel p-4 rounded-3xl shadow-sm flex flex-col gap-3">
+                    <h3 class="font-title font-bold text-sm text-slate-500 uppercase tracking-wider px-1">Dificultad</h3>
+                    
+                    <div class="grid grid-cols-3 gap-2">
+                        <button class="diff-btn py-1.5 px-3 rounded-xl font-bold text-xs transition border-2 border-transparent bg-slate-100 text-slate-600 hover:bg-slate-200" data-grid="10">
+                            Fácil <span class="block text-[10px] opacity-75">10x10</span>
+                        </button>
+                        <button class="diff-btn py-1.5 px-3 rounded-xl font-bold text-xs transition border-2 border-indigo-500 bg-indigo-50 text-indigo-700" data-grid="14">
+                            Normal <span class="block text-[10px] opacity-75">14x14</span>
+                        </button>
+                        <button class="diff-btn py-1.5 px-3 rounded-xl font-bold text-xs transition border-2 border-transparent bg-slate-100 text-slate-600 hover:bg-slate-200" data-grid="18">
+                            Difícil <span class="block text-[10px] opacity-75">18x18</span>
+                        </button>
+                    </div>
+
+                    <div class="flex gap-2 pt-2">
+                        <button id="btn-hint" class="flex-1 bg-amber-400 hover:bg-amber-500 text-amber-950 font-bold py-2 px-3 rounded-xl shadow-sm transition flex items-center justify-center gap-2 text-sm active:scale-95">
+                            <i class="fa-solid fa-lightbulb"></i>
+                            Pista (<span id="hint-count">3</span>)
+                        </button>
+                        <button id="btn-restart" class="bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold py-2 px-4 rounded-xl transition flex items-center justify-center gap-2 text-sm active:scale-95" title="Reiniciar tablero">
+                            <i class="fa-solid fa-rotate-right"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Word List Container -->
+                <div class="glass-panel p-4 rounded-3xl shadow-sm flex-grow">
+                    <div class="flex justify-between items-center mb-3 px-1">
+                        <h3 class="font-title font-bold text-slate-700 text-lg flex items-center gap-2">
+                            <i class="fa-solid fa-list-check text-indigo-500"></i> Palabras
+                        </h3>
+                        <span class="text-xs font-semibold px-2.5 py-1 bg-slate-100 rounded-full text-slate-500" id="category-badge">Tema</span>
+                    </div>
+                    
+                    <div id="word-list" class="grid grid-cols-2 gap-2 max-h-56 lg:max-h-80 overflow-y-auto pr-1 custom-scrollbar">
+                        <!-- JS inserted word tags -->
+                    </div>
+                </div>
+
+            </div>
+
+            <!-- Word Search Grid Board -->
+            <div class="lg:col-span-8 order-1 lg:order-2 flex justify-center items-center">
+                <div class="glass-panel p-3 sm:p-5 rounded-3xl shadow-md w-full max-w-2xl flex flex-col items-center">
+                    <div id="grid-container" class="w-full max-w-[520px] aspect-square grid gap-1 p-2 bg-slate-200/60 rounded-2xl select-none touch-none">
+                        <!-- JS generated grid cells -->
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </main>
+
+    <!-- Win Modal Dialog -->
+    <div id="win-modal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-md hidden z-50 flex items-center justify-center p-4">
+        <div class="bg-white rounded-3xl p-6 sm:p-8 max-w-sm w-full text-center shadow-2xl transform transition-all scale-95 border-4 border-amber-300">
+            <div class="w-20 h-20 bg-amber-100 text-amber-500 rounded-full flex items-center justify-center mx-auto mb-4 text-4xl shadow-inner animate-bounce">
+                <i class="fa-solid fa-trophy"></i>
+            </div>
+            <h2 class="text-2xl font-bold font-title text-slate-800 mb-1">¡Felicidades! 🎉</h2>
+            <p class="text-sm text-slate-600 mb-4">¡Has completado la sopa de letras con éxito!</p>
+
+            <div class="bg-slate-50 p-4 rounded-2xl mb-6 grid grid-cols-2 gap-2 text-center">
+                <div>
+                    <span class="text-xs text-slate-400 font-semibold block uppercase">Tiempo</span>
+                    <span id="final-time" class="text-lg font-bold text-slate-700">00:00</span>
+                </div>
+                <div>
+                    <span class="text-xs text-slate-400 font-semibold block uppercase">Dificultad</span>
+                    <span id="final-diff" class="text-lg font-bold text-slate-700">Normal</span>
+                </div>
+            </div>
+
+            <button id="btn-next-game" class="w-full bg-gradient-to-r from-pink-500 to-rose-500 hover:from-pink-600 hover:to-rose-600 text-white font-bold py-3 px-6 rounded-2xl shadow-lg shadow-pink-500/30 transition transform active:scale-95 flex items-center justify-center gap-2">
+                <i class="fa-solid fa-play"></i> Jugar de Nuevo
+            </button>
+        </div>
+    </div>
+
+    <!-- Footer -->
+    <footer class="w-full text-center py-3 text-xs font-medium text-slate-500">
+        Sopa de Letras Interactiva &copy; 2026 • ¡Aprende y Diviértete!
+    </footer>
+
+    <script>
+        // --- DATA STRUCTURES & CATEGORIES ---
+        const CATEGORIES = {
+            kitty: {
+                id: 'kitty',
+                name: 'Hello Kitty',
+                icon: 'fa-cat',
+                bg: 'bg-rose-50',
+                accent: 'themePink',
+                colors: {
+                    badge: 'bg-pink-100 text-pink-700',
+                    gridBg: 'bg-pink-200/50',
+                    cellFound: 'bg-pink-400 text-white shadow-pink-300',
+                    palette: ['#f43f5e', '#ec4899', '#fb7185', '#fda4af']
+                },
+                words: ['KITTY', 'MIMMY', 'DANIEL', 'APPLE', 'BOW', 'PINK', 'FRIENDS', 'SANRIO', 'CINNAMOROLL', 'KUROMI']
+            },
+            astro: {
+                id: 'astro',
+                name: 'Astronomía',
+                icon: 'fa-user-astronaut',
+                bg: 'bg-indigo-950/5',
+                accent: 'themeAstro',
+                colors: {
+                    badge: 'bg-indigo-100 text-indigo-700',
+                    gridBg: 'bg-indigo-200/50',
+                    cellFound: 'bg-indigo-500 text-white shadow-indigo-300',
+                    palette: ['#6366f1', '#818cf8', '#3b82f6', '#a855f7']
+                },
+                words: ['GALAXIA', 'ESTRELLA', 'PLANETA', 'COMETA', 'NEBULOSA', 'ORBITA', 'TELESCOPIO', 'LUNA', 'SOL', 'ECLIPSE']
+            },
+            aztec: {
+                id: 'aztec',
+                name: 'Dioses Prehispánicos',
+                icon: 'fa-sun',
+                bg: 'bg-amber-50',
+                accent: 'themeAztec',
+                colors: {
+                    badge: 'bg-amber-100 text-amber-800',
+                    gridBg: 'bg-amber-200/50',
+                    cellFound: 'bg-amber-500 text-white shadow-amber-300',
+                    palette: ['#f59e0b', '#d97706', '#b45309', '#eab308']
+                },
+                words: ['QUETZALCOATL', 'TLALOC', 'HUITZILOPOCHTLI', 'TEZCATLIPOCA', 'COATLICUE', 'KUKULKAN', 'CHAAC', 'MEXTLI', 'TONATIUH', 'XIPE']
+            },
+            floral: {
+                id: 'floral',
+                name: 'Flores',
+                icon: 'fa-fan',
+                bg: 'bg-fuchsia-50',
+                accent: 'themeFloral',
+                colors: {
+                    badge: 'bg-fuchsia-100 text-fuchsia-700',
+                    gridBg: 'bg-fuchsia-200/50',
+                    cellFound: 'bg-fuchsia-500 text-white shadow-fuchsia-300',
+                    palette: ['#ec4899', '#d946ef', '#c084fc', '#f472b6']
+                },
+                words: ['ROSA', 'GIRASOL', 'TULIPAN', 'ORQUIDEA', 'MARGARITA', 'LAVANDA', 'JASMINE', 'LIRIO', 'NARCISO', 'BEGONIA']
+            },
+            animals: {
+                id: 'animals',
+                name: 'Animalitos',
+                icon: 'fa-paw',
+                bg: 'bg-emerald-50',
+                accent: 'themeAnimals',
+                colors: {
+                    badge: 'bg-emerald-100 text-emerald-800',
+                    gridBg: 'bg-emerald-200/50',
+                    cellFound: 'bg-emerald-500 text-white shadow-emerald-300',
+                    palette: ['#22c55e', '#10b981', '#34d399', '#84cc16']
+                },
+                words: ['PANDA', 'KOALA', 'CONEJO', 'GATO', 'PERRO', 'ZORRO', 'ARDILLA', 'PENGUIN', 'MAPACHE', 'VENADO']
+            },
+            sea: {
+                id: 'sea',
+                name: 'Animalitos Marinos',
+                icon: 'fa-fish-fins',
+                bg: 'bg-cyan-50',
+                accent: 'themeSea',
+                colors: {
+                    badge: 'bg-cyan-100 text-cyan-800',
+                    gridBg: 'bg-cyan-200/50',
+                    cellFound: 'bg-cyan-500 text-white shadow-cyan-300',
+                    palette: ['#06b6d4', '#0284c7', '#38bdf8', '#2dd4bf']
+                },
+                words: ['DELFIN', 'BALLENA', 'PULPO', 'TIBURON', 'MEDUSA', 'CABALLITO', 'TORTUGA', 'MANTARRAYA', 'CANGREJO', 'FOCA']
+            }
+        };
+
+        // --- AUDIO SYNTHESIZER ---
+        class SoundEffects {
+            constructor() {
+                this.ctx = null;
+                this.muted = false;
+            }
+
+            init() {
+                if (!this.ctx) {
+                    this.ctx = new (window.AudioContext || window.webkitAudioContext)();
+                }
+            }
+
+            playTone(freq, type = 'sine', duration = 0.1, gainVal = 0.1) {
+                if (this.muted) return;
+                this.init();
+                
+                try {
+                    const osc = this.ctx.createOscillator();
+                    const gain = this.ctx.createGain();
+                    
+                    osc.type = type;
+                    osc.frequency.setValueAtTime(freq, this.ctx.currentTime);
+                    
+                    gain.gain.setValueAtTime(gainVal, this.ctx.currentTime);
+                    gain.gain.exponentialRampToValueAtTime(0.0001, this.ctx.currentTime + duration);
+                    
+                    osc.connect(gain);
+                    gain.connect(this.ctx.destination);
+                    
+                    osc.start();
+                    osc.stop(this.ctx.currentTime + duration);
+                } catch(e) {
+                    // Audio context errors ignored
+                }
+            }
+
+            playSelect() {
+                this.playTone(523.25, 'sine', 0.08, 0.05); // C5
+            }
+
+            playFound() {
+                if (this.muted) return;
+                this.init();
+                const notes = [523.25, 659.25, 783.99, 1046.50]; // C5, E5, G5, C6
+                notes.forEach((freq, idx) => {
+                    setTimeout(() => {
+                        this.playTone(freq, 'triangle', 0.15, 0.1);
+                    }, idx * 60);
+                });
+            }
+
+            playWin() {
+                if (this.muted) return;
+                this.init();
+                const notes = [440, 554.37, 659.25, 880, 659.25, 880];
+                notes.forEach((freq, idx) => {
+                    setTimeout(() => {
+                        this.playTone(freq, 'sine', 0.25, 0.12);
+                    }, idx * 120);
+                });
+            }
+        }
+
+        const sound = new SoundEffects();
+
+        // --- GAME STATE ---
+        let currentCategory = CATEGORIES.kitty;
+        let gridSize = 14; // Default Normal
+        let grid = []; // 2D array of { char, wordIdx }
+        let placedWords = []; // List of { word, startRow, startCol, endRow, endCol, found, color }
+        let selectedCells = []; // Array of { r, c }
+        let isMouseDown = false;
+        let hintsLeft = 3;
+        let timerInterval = null;
+        let secondsElapsed = 0;
+
+        // --- GAME LOGIC & GENERATION ---
+        function initGame() {
+            clearInterval(timerInterval);
+            secondsElapsed = 0;
+            updateTimerDisplay();
+            timerInterval = setInterval(() => {
+                secondsElapsed++;
+                updateTimerDisplay();
+            }, 1000);
+
+            hintsLeft = 3;
+            document.getElementById('hint-count').innerText = hintsLeft;
+            selectedCells = [];
+            
+            // Build Board Grid
+            generateGrid();
+            renderCategoryTabs();
+            renderGrid();
+            renderWordList();
+            updateUITheme();
+        }
+
+        function generateGrid() {
+            // Initialize empty grid
+            grid = Array(gridSize).fill(null).map(() => Array(gridSize).fill(null));
+            placedWords = [];
+
+            const wordsToPlace = [...currentCategory.words];
+            // Sort by length descending for better placement success
+            wordsToPlace.sort((a, b) => b.length - a.length);
+
+            const directions = [
+                { r: 0, c: 1 },   // Horizontal right
+                { r: 1, c: 0 },   // Vertical down
+                { r: 1, c: 1 },   // Diagonal down-right
+                { r: -1, c: 1 },  // Diagonal up-right
+                { r: 0, c: -1 },  // Horizontal left
+                { r: -1, c: 0 }   // Vertical up
+            ];
+
+            wordsToPlace.forEach((word, index) => {
+                let placed = false;
+                let attempts = 0;
+
+                while (!placed && attempts < 200) {
+                    attempts++;
+                    const dir = directions[Math.floor(Math.random() * directions.length)];
+                    const startRow = Math.floor(Math.random() * gridSize);
+                    const startCol = Math.floor(Math.random() * gridSize);
+
+                    const endRow = startRow + dir.r * (word.length - 1);
+                    const endCol = startCol + dir.c * (word.length - 1);
+
+                    // Check bounds
+                    if (endRow >= 0 && endRow < gridSize && endCol >= 0 && endCol < gridSize) {
+                        let canPlace = true;
+
+                        for (let i = 0; i < word.length; i++) {
+                            const r = startRow + dir.r * i;
+                            const c = startCol + dir.c * i;
+                            const cell = grid[r][c];
+
+                            if (cell !== null && cell !== word[i]) {
+                                canPlace = false;
+                                break;
+                            }
+                        }
+
+                        if (canPlace) {
+                            const wordColor = currentCategory.colors.palette[index % currentCategory.colors.palette.length];
+                            
+                            for (let i = 0; i < word.length; i++) {
+                                const r = startRow + dir.r * i;
+                                const c = startCol + dir.c * i;
+                                grid[r][c] = word[i];
+                            }
+
+                            placedWords.push({
+                                word: word,
+                                startRow, startCol, endRow, endCol,
+                                dir,
+                                found: false,
+                                color: wordColor,
+                                cells: Array.from({ length: word.length }, (_, i) => ({
+                                    r: startRow + dir.r * i,
+                                    c: startCol + dir.c * i
+                                }))
+                            });
+                            placed = true;
+                        }
+                    }
+                }
+            });
+
+            // Fill empty cells with random Spanish letters
+            const alphabet = 'ABCDEFGHIJKLMNÑOPQRSTUVWXYZ';
+            for (let r = 0; r < gridSize; r++) {
+                for (let c = 0; c < gridSize; c++) {
+                    if (grid[r][c] === null) {
+                        grid[r][c] = alphabet.charAt(Math.floor(Math.random() * alphabet.length));
+                    }
+                }
+            }
+        }
+
+        function renderGrid() {
+            const container = document.getElementById('grid-container');
+            container.innerHTML = '';
+            container.style.gridTemplateColumns = `repeat(${gridSize}, minmax(0, 1fr))`;
+
+            // Adjust font size dynamically based on grid size
+            let fontSizeClass = 'text-base md:text-lg';
+            if (gridSize === 14) fontSizeClass = 'text-xs sm:text-sm md:text-base';
+            if (gridSize === 18) fontSizeClass = 'text-[10px] sm:text-xs md:text-sm';
+
+            for (let r = 0; r < gridSize; r++) {
+                for (let c = 0; c < gridSize; c++) {
+                    const cellEl = document.createElement('div');
+                    cellEl.className = `letter-cell bg-white/90 text-slate-700 shadow-sm ${fontSizeClass} select-none`;
+                    cellEl.dataset.row = r;
+                    cellEl.dataset.col = c;
+                    cellEl.innerText = grid[r][c];
+
+                    // Touch & Mouse Event Handlers
+                    cellEl.addEventListener('mousedown', (e) => handleStartSelect(r, c, e));
+                    cellEl.addEventListener('mouseenter', () => handleHoverSelect(r, c));
+                    
+                    container.appendChild(cellEl);
+                }
+            }
+
+            // Mobile Touch Support
+            container.addEventListener('touchstart', handleTouchStart, { passive: false });
+            container.addEventListener('touchmove', handleTouchMove, { passive: false });
+            container.addEventListener('touchend', handleSelectEnd);
+        }
+
+        function renderWordList() {
+            const listEl = document.getElementById('word-list');
+            listEl.innerHTML = '';
+
+            placedWords.forEach((pw) => {
+                const item = document.createElement('div');
+                item.id = `word-item-${pw.word}`;
+                item.className = `flex items-center gap-2 p-2 rounded-xl border text-xs sm:text-sm font-bold transition-all duration-300 ${
+                    pw.found 
+                        ? 'bg-emerald-100 border-emerald-300 text-emerald-800 line-through opacity-80' 
+                        : 'bg-white/80 border-slate-200 text-slate-700 shadow-sm'
+                }`;
+
+                item.innerHTML = `
+                    <span class="w-5 h-5 rounded-full flex items-center justify-center text-[10px] ${pw.found ? 'bg-emerald-500 text-white' : 'bg-slate-200 text-slate-500'}">
+                        <i class="fa-solid ${pw.found ? 'fa-check' : 'fa-minus'}"></i>
+                    </span>
+                    <span class="tracking-wider">${pw.word}</span>
+                `;
+                listEl.appendChild(item);
+            });
+
+            updateFoundCounter();
+        }
+
+        function renderCategoryTabs() {
+            const container = document.getElementById('category-tabs');
+            container.innerHTML = '';
+
+            Object.values(CATEGORIES).forEach((cat) => {
+                const isActive = cat.id === currentCategory.id;
+                const btn = document.createElement('button');
+                btn.className = `flex items-center gap-2 px-4 py-2.5 rounded-2xl font-bold text-xs sm:text-sm transition-all shadow-sm ${
+                    isActive 
+                        ? 'bg-white text-slate-800 scale-105 border-2 border-slate-800 shadow-md' 
+                        : 'bg-white/60 text-slate-600 hover:bg-white/90 border border-white/50'
+                }`;
+                btn.innerHTML = `<i class="fa-solid ${cat.icon} text-base"></i> ${cat.name}`;
+                btn.onclick = () => {
+                    sound.playSelect();
+                    currentCategory = cat;
+                    initGame();
+                };
+                container.appendChild(btn);
+            });
+        }
+
+        function updateUITheme() {
+            document.getElementById('body-bg').className = `min-h-screen text-slate-800 flex flex-col justify-between transition-colors duration-500 ${currentCategory.bg}`;
+            document.getElementById('category-badge').className = `text-xs font-semibold px-2.5 py-1 rounded-full ${currentCategory.colors.badge}`;
+            document.getElementById('category-badge').innerText = currentCategory.name;
+            
+            const logo = document.getElementById('theme-logo');
+            logo.innerHTML = `<i class="fa-solid ${currentCategory.icon}"></i>`;
+        }
+
+        // --- SELECTION & INTERACTION LOGIC ---
+        function handleStartSelect(r, c, e) {
+            if (e) e.preventDefault();
+            isMouseDown = true;
+            sound.playSelect();
+            selectedCells = [{ r, c }];
+            highlightSelectedCells();
+        }
+
+        function handleHoverSelect(r, c) {
+            if (!isMouseDown || selectedCells.length === 0) return;
+            
+            const start = selectedCells[0];
+            const deltaR = r - start.r;
+            const deltaC = c - start.c;
+
+            // Determine straight or diagonal direction vector
+            const stepR = deltaR === 0 ? 0 : deltaR / Math.abs(deltaR);
+            const stepC = deltaC === 0 ? 0 : deltaC / Math.abs(deltaC);
+
+            // Ensure selection is strictly straight horizontal, vertical, or 45-degree diagonal
+            if (deltaR === 0 || deltaC === 0 || Math.abs(deltaR) === Math.abs(deltaC)) {
+                const steps = Math.max(Math.abs(deltaR), Math.abs(deltaC));
+                const newSelection = [];
+
+                for (let i = 0; i <= steps; i++) {
+                    newSelection.push({
+                        r: start.r + stepR * i,
+                        c: start.c + stepC * i
+                    });
+                }
+                selectedCells = newSelection;
+                highlightSelectedCells();
+            }
+        }
+
+        function handleSelectEnd() {
+            if (!isMouseDown) return;
+            isMouseDown = false;
+
+            // Form selected string word
+            const selectedWord = selectedCells.map(cell => grid[cell.r][cell.c]).join('');
+            const reversedWord = selectedWord.split('').reverse().join('');
+
+            let matched = false;
+
+            placedWords.forEach((pw) => {
+                if (!pw.found && (pw.word === selectedWord || pw.word === reversedWord)) {
+                    // Check if positions match
+                    const firstCell = selectedCells[0];
+                    const lastCell = selectedCells[selectedCells.length - 1];
+
+                    const isNormalMatch = (firstCell.r === pw.startRow && firstCell.c === pw.startCol && lastCell.r === pw.endRow && lastCell.c === pw.endCol);
+                    const isReverseMatch = (firstCell.r === pw.endRow && firstCell.c === pw.endCol && lastCell.r === pw.startRow && lastCell.c === pw.startCol);
+
+                    if (isNormalMatch || isReverseMatch) {
+                        pw.found = true;
+                        matched = true;
+                        sound.playFound();
+                        markWordAsFound(pw);
+                    }
+                }
+            });
+
+            if (!matched) {
+                clearSelectionHighlights();
+            }
+
+            selectedCells = [];
+            checkWinCondition();
+        }
+
+        function highlightSelectedCells() {
+            // First clear temporary selections
+            document.querySelectorAll('.letter-cell').forEach(cell => {
+                if (!cell.classList.contains('cell-found-perm')) {
+                    cell.className = cell.className.replace(/ cell-selected/g, '');
+                    cell.style.backgroundColor = '';
+                    cell.style.color = '';
+                }
+            });
+
+            selectedCells.forEach(sc => {
+                const el = document.querySelector(`.letter-cell[data-row="${sc.r}"][data-col="${sc.c}"]`);
+                if (el && !el.classList.contains('cell-found-perm')) {
+                    el.classList.add('cell-selected');
+                }
+            });
+        }
+
+        function clearSelectionHighlights() {
+            document.querySelectorAll('.cell-selected').forEach(cell => {
+                cell.classList.remove('cell-selected');
+            });
+        }
+
+        function markWordAsFound(pw) {
+            pw.cells.forEach(c => {
+                const el = document.querySelector(`.letter-cell[data-row="${c.r}"][data-col="${c.c}"]`);
+                if (el) {
+                    el.classList.remove('cell-selected');
+                    el.classList.add('cell-found', 'cell-found-perm');
+                    el.style.backgroundColor = pw.color;
+                    el.style.color = '#ffffff';
+                    el.style.boxShadow = `0 0 8px ${pw.color}aa`;
+                }
+            });
+
+            renderWordList();
+        }
+
+        function handleTouchStart(e) {
+            if (e.touches.length === 1) {
+                const touch = e.touches[0];
+                const target = document.elementFromPoint(touch.clientX, touch.clientY);
+                if (target && target.classList.contains('letter-cell')) {
+                    e.preventDefault();
+                    const r = parseInt(target.dataset.row);
+                    const c = parseInt(target.dataset.col);
+                    handleStartSelect(r, c, e);
+                }
+            }
+        }
+
+        function handleTouchMove(e) {
+            if (isMouseDown && e.touches.length === 1) {
+                e.preventDefault();
+                const touch = e.touches[0];
+                const target = document.elementFromPoint(touch.clientX, touch.clientY);
+                if (target && target.classList.contains('letter-cell')) {
+                    const r = parseInt(target.dataset.row);
+                    const c = parseInt(target.dataset.col);
+                    handleHoverSelect(r, c);
+                }
+            }
+        }
+
+        // Global mouseup event listener
+        window.addEventListener('mouseup', handleSelectEnd);
+
+        // --- HINT SYSTEM ---
+        document.getElementById('btn-hint').addEventListener('click', () => {
+            if (hintsLeft <= 0) return;
+
+            const unfound = placedWords.filter(w => !w.found);
+            if (unfound.length === 0) return;
+
+            hintsLeft--;
+            document.getElementById('hint-count').innerText = hintsLeft;
+            sound.playSelect();
+
+            // Pick a random unfound word
+            const targetWord = unfound[Math.floor(Math.random() * unfound.length)];
+            const firstCell = targetWord.cells[0];
+
+            // Pulse highlight the first cell
+            const cellEl = document.querySelector(`.letter-cell[data-row="${firstCell.r}"][data-col="${firstCell.c}"]`);
+            if (cellEl) {
+                cellEl.classList.add('ring-4', 'ring-amber-400', 'animate-bounce');
+                setTimeout(() => {
+                    cellEl.classList.remove('ring-4', 'ring-amber-400', 'animate-bounce');
+                }, 2000);
+            }
+        });
+
+        // --- TIMER & COUNTERS ---
+        function updateTimerDisplay() {
+            const mins = Math.floor(secondsElapsed / 60).toString().padStart(2, '0');
+            const secs = (secondsElapsed % 60).toString().padStart(2, '0');
+            document.getElementById('timer-display').innerText = `${mins}:${secs}`;
+        }
+
+        function updateFoundCounter() {
+            const foundCount = placedWords.filter(w => w.found).length;
+            document.getElementById('found-counter').innerText = `${foundCount} / ${placedWords.length}`;
+        }
+
+        // --- WIN CONDITION & CELEBRATION ---
+        function checkWinCondition() {
+            const allFound = placedWords.length > 0 && placedWords.every(w => w.found);
+            if (allFound) {
+                clearInterval(timerInterval);
+                sound.playWin();
+
+                // Trigger Confetti Animation
+                if (typeof confetti === 'function') {
+                    confetti({
+                        particleCount: 120,
+                        spread: 70,
+                        origin: { y: 0.6 }
+                    });
+                }
+
+                // Show Modal
+                setTimeout(() => {
+                    document.getElementById('final-time').innerText = document.getElementById('timer-display').innerText;
+                    const diffText = gridSize === 10 ? 'Fácil' : gridSize === 14 ? 'Normal' : 'Difícil';
+                    document.getElementById('final-diff').innerText = diffText;
+                    document.getElementById('win-modal').classList.remove('hidden');
+                }, 500);
+            }
+        }
+
+        // --- EVENT LISTENERS & INITIALIZATION ---
+        document.getElementById('btn-restart').addEventListener('click', () => {
+            sound.playSelect();
+            initGame();
+        });
+
+        document.getElementById('btn-next-game').addEventListener('click', () => {
+            document.getElementById('win-modal').classList.add('hidden');
+            initGame();
+        });
+
+        // Difficulty Buttons
+        document.querySelectorAll('.diff-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                sound.playSelect();
+                document.querySelectorAll('.diff-btn').forEach(b => {
+                    b.className = 'diff-btn py-1.5 px-3 rounded-xl font-bold text-xs transition border-2 border-transparent bg-slate-100 text-slate-600 hover:bg-slate-200';
+                });
+                btn.className = 'diff-btn py-1.5 px-3 rounded-xl font-bold text-xs transition border-2 border-indigo-500 bg-indigo-50 text-indigo-700';
+                gridSize = parseInt(btn.dataset.grid);
+                initGame();
+            });
+        });
+
+        // Mute / Unmute Toggle
+        document.getElementById('btn-sound').addEventListener('click', () => {
+            sound.muted = !sound.muted;
+            const icon = document.getElementById('sound-icon');
+            if (sound.muted) {
+                icon.className = 'fa-solid fa-volume-xmark text-rose-500';
+            } else {
+                icon.className = 'fa-solid fa-volume-high text-slate-600';
+            }
+        });
+
+        // Start game on page load
+        window.onload = () => {
+            initGame();
+        };
+    </script>
+</body>
+</html>
